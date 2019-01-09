@@ -154,7 +154,7 @@
             </div>
         </dt>
     </dl>
-    
+
     <script src="js/jquery.min.js"></script>
     <script src="js/jquery_easy_ui/jquery.parser.js"></script>
     <script src="js/jquery_easy_ui/jquery.tree.js"></script>
@@ -199,15 +199,16 @@
                 evt.stopPropagation();
             }).on('click', '#tree_selected_clear', function() { // 清空
                 treeSelectMod.selectedData = [];
-                treeSelectMod.$treeTarget.html('');
+                $('#tree_selected').html('');
                 $('#tree_selected_num').html('0');
             });
         },
         init: function() {
             treeSelectMod.event();
-            treeSelectMod.getTagInfo();
+            treeSelectMod.renderSelectTree();
         },
-        getTagInfo: function() {
+        // 渲染左侧被拖拽的树
+        renderSelectTree: function() {
             treeSelectMod.$treeTarget.addClass('loading');
 
             setTimeout(function () { // 实际中，通过 ajax 获取数据，这儿用 延时 模拟
@@ -247,6 +248,7 @@
                 }
             }, 1000);
         },
+        // 统计已选择节点数
         getTreeChildNum: function(treeData) {
             var count = 0;
             treeData.forEach(function(item) {
@@ -255,7 +257,7 @@
             return count;
         },
         // 渲染已选数据
-        renderTree: function(treeData) {
+        renderSelectedTree: function(treeData) {
             $('#tree_selected').tree({
                 data: treeData,
                 formatter: function(node) {
@@ -291,7 +293,7 @@
                         }
                     }
                     // 重新根据过滤后的数据进行渲染 DOM
-                    treeSelectMod.renderTree(treeSelectMod.selectedData);
+                    treeSelectMod.renderSelectedTree(treeSelectMod.selectedData);
                 },
                 onLoadSuccess: function() {
                     // 统计选择的标签：子节点参与统计
@@ -381,7 +383,7 @@
                     }
                     
                     // 最后，渲染 DOM
-                    treeSelectMod.renderTree(treeSelectMod.selectedData);
+                    treeSelectMod.renderSelectedTree(treeSelectMod.selectedData);
                 }
             });
 
@@ -442,7 +444,7 @@
                 
                 // 保存已选数据，并渲染 DOM
                 treeSelectMod.selectedData = treeData;
-                treeSelectMod.renderTree(treeSelectMod.selectedData);
+                treeSelectMod.renderSelectedTree(treeSelectMod.selectedData);
             }
         }
     };
