@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>树形拖拽选择</title>
+    <link rel="stylesheet" href="css/jquery_easy_ui/default/tree.css" />
+    <style>
+    * {
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        font: 12px/12px '微软雅黑';
+        color: #666;
+    }
+
+    dl {
+        margin: 10px;
+    }
+
+    dl>dd {
+        margin-bottom: 10px;
+    }
+
+    .loading {
+        height: 100%;
+        line-height: 100%;
+        position: relative;
+    }
+    .loading:before {
+        position: absolute;
+        top: calc(50% - 30px);
+        left: calc(50% - 30px);
+        content: "";
+        width: 60px;
+        height: 60px;
+        border-radius: 100%;
+        border: 5px solid skyblue;
+        border-left-color: transparent;
+        border-right-color: transparent;
+        animation: loading 1s linear infinite; 
+    }
+    .loading:after {
+        position: absolute;
+        top: calc(50% - 30px);
+        left: calc(50% - 30px);
+        content: "";
+        width: 60px;
+        height: 60px;
+        border-radius: 100%;
+        border: 5px solid yellow;
+        border-top-color: transparent;
+        border-bottom-color: transparent;
+        animation: loading 2s linear infinite; 
+    }
+    @keyframes loading {
+        from {
+            transform: rotate(0deg);
+        }
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .tree-select {
+        overflow: hidden;
+        width: 100%;
+        font-size: 12px;
+    }
+    
+    .tree-icon {
+        display: none;
+    }
+
+    .tree-left,
+    .tree-right {
+        float: left;
+        border-radius: 2px;
+        width: calc(50% - 8px);
+        border: 1px solid #bbb;
+        box-sizing: border-box;
+    }
+
+    .tree-right {
+        margin-left: 15px;
+    }
+
+    .tree-select .tree-header {
+        margin: 5px;
+        height: 32px;
+        line-height: 32px;
+    }
+
+    .tree-select .search .search-input {
+        padding: 3px 5px;
+        height: 20px;
+        width: 200px;
+        border-radius: 2px;
+        border: 1px solid #999;
+        outline: none;
+    }
+
+    .tree-select .clear-all {
+        padding: 4px 7px;
+        background: #03a9f4;
+        color: #fff;
+        cursor: pointer;
+        border-radius: 2px 9px;
+        transition: all 0.3s;
+    }
+
+    .tree-select .clear-all:hover {
+        background: #2196f3;
+        border-radius: 9px 2px;
+    }
+
+    .tree-select .tree-con {
+        margin: 5px;
+        padding: 5px;
+        overflow: auto;
+        height: 300px;
+        border-top: 1px solid #ccc;
+    }
+
+    .tree-select .tree-con .tree-node-del {
+        margin-left: 5px;
+        font-size: 14px;
+        color: red;
+    }
+    </style>
+</head>
+
+<body>
+    <dl>
+        <dd>树形拖拽选择</dd>
+        <dt>
+            <div class="tree-select">
+                <div class="tree-left">
+                    <div class="search tree-header" id="search">
+                        <input class="search-input" placeholder="搜索标签" value="" />
+                    </div>
+                    <ul class="tree-con loading" id="tree_select"></ul>
+                </div>
+                <div class='tree-right'>
+                    <div class="tip-wrap tree-header">
+                        <span class="tip-num">已选标签（<span class="num" id="tree_selected_num">0</span>）</span>
+                        <span class="clear-all" id="tree_selected_clear">清空</span>
+                    </div>
+                    <ul class="tree-con" id="tree_selected">
+                    </ul>
+                </div>
+            </div>
+        </dt>
+    </dl>
+    
+    <script src="js/jquery.min.js"></script>
+    <script src="js/jquery_easy_ui/jquery.parser.js"></script>
+    <script src="js/jquery_easy_ui/jquery.tree.js"></script>
+    <script src="js/jquery_easy_ui/jquery.draggable.js"></script>
+    <script src="js/jquery_easy_ui/jquery.droppable.js"></script>
+    <!-- 数据 -->
+    <script src="js/data.js"></script>
+    <script>
+    var isEdit = true;
+    var editJson = {
+        resource: ["10002000", "10142050", "10302402", "10302406"] // 回填已选择数据，均为子节点 id
+    };
+
+    /* 拖拽选择 */
+    var treeSelectMod = {
+        noDataHtml: '<li>暂无数据</li>',
+        selectedData: [],
+        $treeTarget: $('#tree_select'),
+        event: function() {
+            $('body').on('focus keyup', '#search .search-input', function(evt) { // 标签智能搜索
+                var $this = $(this),
+                    curVal = $.trim($(this).val()).toUpperCase(),
+                    $nodeNames = treeSelectMod.$treeTarget.find('.node-name');
+                treeSelectMod.$treeTarget.find('.tree-node').hide();
+
+                $nodeNames.each(function(index, item) {
+                    var nodeName = $(item).text().toUpperCase();
+                    if (nodeName.indexOf(curVal) !== -1) {
+                        var $treeNode = $(item).parents('.tree-node'); // 当前节点
+                        $treeNode.parent('li').find('ul').find('.tree-node').show(); // 子级显示
+                        showParent($treeNode); // 递归显示父级
+
+                        function showParent($treeNode) {
+                            if ($treeNode.length > 0) {
+                                $treeNode.show();
+                                $treeNode = $treeNode.parent('li').parent('ul').prev('.tree-node');
+                                showParent($treeNode);
+                            }
+                        }
+                    }
+                });
+                evt.stopPropagation();
+            }).on('click', '#tree_selected_clear', function() { // 清空
+                treeSelectMod.selectedData = [];
+                treeSelectMod.$treeTarget.html('');
+                $('#tree_selected_num').html('0');
+            });
+        },
+        init: function() {
+            treeSelectMod.event();
+            treeSelectMod.getTagInfo();
+        },
+        getTagInfo: function() {
+            treeSelectMod.$treeTarget.addClass('loading');
+
+            setTimeout(function () { // 实际中，通过 ajax 获取数据，这儿用 延时 模拟
+                treeSelectMod.$treeTarget.removeClass('loading');
+
+                if (result && result.flag && result.data && result.data.length) {
+                    //实例化树形菜单
+                    treeSelectMod.$treeTarget.tree({
+                        data: result.data,
+                        dnd: true, // 允许拖拽
+                        formatter: function(node) {
+                            // 统计子节点个数
+                            var text = '<span class="node-name">' + node.text + '</span>';
+                            if (node.children && node.children.length > 0) {
+                                text += '<i class="tip">(' + node.children.length + ')</i>';
+                            }
+                            return text;
+                        },
+                        onLoadSuccess: function(e, node) {
+                            // 折叠树
+                            treeSelectMod.$treeTarget.tree('collapseAll');
+                            
+                            // 节点上禁止放置
+                            $.each($('#tree_select .tree-node'), function(i, item) {
+                                $(item).droppable("disable");
+                            });
+                        }
+                    });
+                    treeSelectMod.setDragAndDrop();
+
+                    // 编辑回填：需要有已选数据
+                    if (isEdit) {
+                        treeSelectMod.editInit(result.data);
+                    }
+                } else {
+                    treeSelectMod.$treeTarget.html(treeSelectMod.noDataHtml);
+                }
+            }, 1000);
+        },
+        getTreeChildNum: function(treeData) {
+            var count = 0;
+            treeData.forEach(function(item) {
+                count += item.children ? item.children.length || 0 : 0;
+            });
+            return count;
+        },
+        // 渲染已选数据
+        renderTree: function(treeData) {
+            $('#tree_selected').tree({
+                data: treeData,
+                formatter: function(node) {
+                    var text = '<span class="node-name">' + node.text + '</span>';
+                    if (node.children && node.children.length > 0) {
+                        text += '<i class="tip">(' + node.children.length + ')</i>';
+                    }
+                    text += '<span class="tree-node-del">x</span>';
+                    return text;
+                },
+                onClick: function(node) {
+                    // 删除节点
+                    var selectedData = treeSelectMod.selectedData;
+                    if (node.children && node.children.length) {
+                        // 删除节点是父节点：从已选择的中找到删除节点，进行删除
+                        for (var i = 0; i < selectedData.length; i++) {
+                            if (selectedData[i].id == node.id) {
+                                selectedData.splice(i, 1);
+                            }
+                        }
+                    } else {
+                        // 删除节点是子节点：从已选择的子级中找到删除子节点，进行删除，并展开其父节点，方便查看是否删除
+                        for (var i = 0; i < selectedData.length; i++) {
+                            for (var j = 0; j < selectedData[i].children.length; j++) {
+                                if (selectedData[i].children[j].id == node.id) {
+                                    selectedData[i].children.splice(j, 1);
+                                    selectedData[i].state = 'open';
+                                }
+                            }
+                            if (!selectedData[i].children.length) { // 最后判断，如果父节点下没有子节点了，就把父节点删除
+                                selectedData.splice(i, 1);
+                            }
+                        }
+                    }
+                    // 重新根据过滤后的数据进行渲染 DOM
+                    treeSelectMod.renderTree(treeSelectMod.selectedData);
+                },
+                onLoadSuccess: function() {
+                    // 统计选择的标签：子节点参与统计
+                    $('#tree_selected_num').html(treeSelectMod.getTreeChildNum(treeSelectMod.selectedData));
+                }
+            });
+        },
+        // 拖拽放置
+        setDragAndDrop: function() {
+            // 设置被拖元素
+            $("#tree_select .tree-node").draggable({
+                proxy: 'clone',
+                revert: true, // 拖动结束后节点将返回它的开始位置
+                cursor: 'pointer',
+                onStartDrag: function() {
+                    $(this).draggable('proxy').css({ 'background': '#fff', 'opacity': '0.5' });
+                },
+                onStopDrag: function(e) {
+                    // 拖拽置放位置，不是目标不进行操作
+                    if (e.target.id != 'tree_selected') {
+                        return true
+                    }
+                    var node = treeSelectMod.$treeTarget.tree('getNode', e.data.target); // 获取被拖动的节点数据
+
+                    // 过滤
+                    var selectedData = treeSelectMod.selectedData;
+                    if (node.children && node.children.length) {
+                        // 被拖拽节点是父节点：判断选中数据中是否有当前节点，没有，就加入，有就替换（保证子节点都正确）
+                        var parentNode = {
+                            id: node.id,
+                            text: node.text,
+                            children: [],
+                            state: node.state || 'closed'
+                        };
+                        node.children.forEach(function(item) {
+                            parentNode['children'].push({
+                                id: item.id,
+                                text: item.text
+                            });
+                        })
+                        var hasSameParentNode = false;
+                        for (var i = 0; i < selectedData.length; i++) {
+                            if (selectedData[i].id == node.id) {
+                                hasSameParentNode = true;
+                                selectedData[i] = parentNode;
+                                break;
+                            }
+                        }
+                        if (!hasSameParentNode) {
+                            selectedData.push(parentNode);
+                        }
+                    } else {
+                        // 被拖拽节点为子节点：需要子节点带着其父节点，便于数据正确
+                        // 通过被拖拽节点找其父节点，在选中的数据中进行同级比较，先找到相等的父节点，再在选中的子节点中判断是否有当前拖拽节点，没有就加入子节点，有不进行操作。如果连父节点都没有相等的，就连父节点一起加入
+                        var parent = treeSelectMod.$treeTarget.tree('getParent', e.data.target);
+                        var childNode = {
+                            id: node.id,
+                            text: node.text
+                        };
+                        if (parent) {
+                            var parentNode = {
+                                id: parent.id,
+                                text: parent.text,
+                                state: parent.state || 'closed'
+                            };
+                            parentNode['children'] = [];
+                            parentNode['children'].push(childNode);
+                            
+                            var hasSameParentNode = false;
+                            for (var i = 0; i < selectedData.length; i++) {
+                                if (selectedData[i].id == parent.id) {
+                                    hasSameParentNode = true;
+                                    var children = selectedData[i]['children'] || [];
+                                    var arr = children.filter(function(item) {
+                                        return item.id == node.id;
+                                    });
+                                    if (!arr.length) { // 不存在，加入子节点
+                                        children.push(childNode);
+                                    }
+                                    break;
+                                }
+                            }
+                            if (!hasSameParentNode) { // 没有相等父节点，连父节点一起加入
+                                selectedData.push(parentNode);
+                            }
+                        }
+                    }
+                    
+                    // 最后，渲染 DOM
+                    treeSelectMod.renderTree(treeSelectMod.selectedData);
+                }
+            });
+
+            //设置目标对象允许放置被拖元素
+            $("#tree_selected").droppable();
+        },
+        // 回填已选数据，均为子节点 id
+        editInit: function(data) {
+            if (editJson.resource && editJson.resource.length) {
+                var children = [];
+                // 遍历所有数据，在子级中加入父级，便于直接比较子级相等时找到父级
+                data.forEach(function(item) {
+                    if (item.children && item.children.length) {
+                        item.children.forEach(function(child) {
+                            var child = {
+                                id: child.id,
+                                text: child.text,
+                                parent: item
+                            };
+                            children.push(child);
+                        })
+                    } else {
+                        children.push(item);
+                    }
+                });
+
+                // 遍历子级，和已选子节点 id 比较，过滤得到最终结果：带着父节点
+                // 同级比较，父级比较，没有就加入带着父级的；有就在找到的父级下加入子级
+                var editArr = editJson.resource,
+                    treeData = [];
+                children.forEach(function(item) {
+                    var child = {
+                        id: item.id,
+                        text: item.text
+                    };
+                    if (editArr.indexOf(item.id + '') > -1) {
+                        if (item.parent) {
+                            var hasSameParent = false;
+                            treeData.forEach(function(parent) {
+                                if (parent.id == item.parent.id) { // 存在，添加子级
+                                    parent['children'] = parent.children || [];
+                                    parent.children.push(child);
+                                    hasSameParent = true;
+                                }
+                            })
+                            if (!hasSameParent) { // 不存在，加入带着父级的子级
+                                var parent = {
+                                    id: item.parent.id,
+                                    text: item.parent.text,
+                                    children: [child],
+                                    state: 'closed'
+                                };
+                                treeData.push(parent);
+                            }
+                        }
+                    }
+                });
+                
+                // 保存已选数据，并渲染 DOM
+                treeSelectMod.selectedData = treeData;
+                treeSelectMod.renderTree(treeSelectMod.selectedData);
+            }
+        }
+    };
+
+    treeSelectMod.init();
+    </script>
+</body>
+</html>
