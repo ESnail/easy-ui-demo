@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>树形拖拽选择</title>
+    <link rel="stylesheet" href="css/jquery_easy_ui/default/tree.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font: 12px/12px '微软雅黑';
+            color: #666;
+            padding: 10px 30px;
+        }
+
+        ul {
+            list-style: none;
+        }
+
+        dl {
+            margin: 10px;
+        }
+
+        dl>dd {
+            margin-bottom: 10px;
+        }
+
+        .loading {
+            position: relative;
+            height: 100%;
+            line-height: 100%;
+        }
+        .loading:before {
+            position: absolute;
+            top: calc(50% - 5px);
+            left: calc(50% - 5px);
+            content: "";
+            width: 10px;
+            height: 10px;
+            border-radius: 100%;
+            background: skyblue;
+            animation: loading-reverse .8s linear infinite; 
+        }
+        .loading:after {
+            position: absolute;
+            top: calc(50% - 5px);
+            left: calc(50% - 5px);
+            content: "";
+            width: 10px;
+            height: 10px;
+            border-radius: 100%;
+            background: yellow;
+            animation: loading .8s linear infinite; 
+        }
+        @keyframes loading {
+            from {
+                transform: translate(-20px) scale(.8);
+            }
+            to {
+                transform: translate(20px) scale(1.1);
+            }
+        }
+        @keyframes loading-reverse {
+            from {
+                transform: translate(20px) scale(.8);
+            }
+            to {
+                transform: translate(-20px) scale(1.1);
+            }
+        }
+
+        .tree-drag-relation {
+            margin-top: 40px;
+            width: 100%;
+        }
+        
+        .tree-drag-relation .tree-icon {
+            display: none;
+        }
+
+        .tree-drag-relation .left,
+        .tree-drag-relation .right {
+            float: left;
+            border-radius: 2px;
+            width: calc(50% - 8px);
+            border: 1px solid #bbb;
+            box-sizing: border-box;
+        }
+
+        .tree-drag-relation .right {
+            margin-left: 15px;
+        }
+        
+        .tree-drag-relation .nav {
+            overflow: hidden;
+            margin-top: -30px;
+            height: 30px;
+            line-height: 30px;
+        }
+
+        .tree-drag-relation .nav > li {
+            float: left;
+            padding: 0 4px;
+            background: #03a9f4;
+            color: #fff;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+        .tree-drag-relation .nav > li + li {
+            margin-left: 1px;
+        }
+        .tree-drag-relation .nav > li.active {
+            background: orange;
+            transition: all .2s;
+        }
+
+        .tree-drag-relation .tree-header,
+        .tree-drag-relation .relation-header {
+            margin: 5px;
+            height: 32px;
+            line-height: 32px;
+        }
+
+        .tree-drag-relation .search .search-input {
+            padding: 3px 5px;
+            height: 20px;
+            width: 200px;
+            border-radius: 2px;
+            border: 1px solid #999;
+            outline: none;
+        }
+
+        .tree-drag-relation .clear-all {
+            padding: 4px 7px;
+            background: #03a9f4;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 2px 9px;
+            transition: all 0.3s;
+        }
+
+        .tree-drag-relation .clear-all:hover {
+            background: #2196f3;
+            border-radius: 9px 2px;
+        }
+
+        .tree-drag-relation .tree-con,
+        .tree-drag-relation .relation-con {
+            box-sizing: border-box;
+            margin: 5px;
+            padding: 5px;
+            overflow: auto;
+            height: 350px;
+            border-top: 1px solid #ccc;
+        }
+        .tree-drag-relation .relation-con {
+            padding: 20px 20px 100px;
+        }
+
+        .tree-drag-relation .relation-con .and,
+        .tree-drag-relation .relation-con .or {
+            margin: 5px;
+            width: 10px;
+        }
+
+        .tree-drag-relation .relation-con .or {
+            margin: 5px 10px;
+        }
+
+        .tree-drag-relation .relation-con .or-wrap {
+            margin-bottom: 3px;
+            padding: 10px 20px 50px 10px;
+            background: #ddd;
+        }
+
+        .tree-drag-relation .relation-con .item {
+            margin: 5px;
+            padding: 3px 5px;
+            background: #fff;
+            border: 1px solid #ccc;
+        }
+
+        .tree-drag-relation .relation-con .or-clear,
+        .tree-drag-relation .relation-con .item-del {
+            float: right;
+            color: red;
+            cursor: pointer;
+        }
+        .tree-drag-relation .relation-con .or-clear {
+            margin: -5px -15px 0 0;
+        }
+        .tree-drag-relation .relation-con .or-clear:hover,
+        .tree-drag-relation .relation-con .item-del:hover {
+            transform: rotate(360deg);
+            transition: .5s;
+        }
+
+        .btn-save {
+            margin: 10px;
+            width: 100px;
+            height: 25px;
+            line-height: 25px;
+            text-align: center;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <dl>
+        <dd>树形拖拽重组：或、且</dd>
+        <dt>
+            <div class="tree-drag-relation">
+                <div class="left">
+                    <ul class="nav loading" id="nav"></ul>
+                    <div class="search tree-header" id="search">
+                        <input class="search-input" placeholder="搜索标签" value="" />
+                    </div>
+                    <ul class="tree-con loading" id="tree_drag"></ul>
+                </div>
+                <div class='right'>
+                    <div class="relation-header">
+                        <span class="tip-num">已重组节点（<span class="num" id="node_num">0</span>）</span>
+                        <span class="clear-all" id="clear_all">清空</span>
+                    </div>
+                    <div class="relation-con and-wrap" id="relation_con">
+                    </div>
+                </div>
+            </div>
+        </dt>
+    </dl>
+    <button class="btn-save" id="save">保存</button>
+
+    <script src="js/jquery.min.js"></script>
+    <script src="js/jquery_easy_ui/jquery.parser.js"></script>
+    <script src="js/jquery_easy_ui/jquery.tree.js"></script>
+    <script src="js/jquery_easy_ui/jquery.draggable.js"></script>
+    <script src="js/jquery_easy_ui/jquery.droppable.js"></script>
+    <!-- 数据 -->
+    <script src="data/tree-drag-relation.js"></script>
+    <script>
+    var isEdit = true;
+    var editJson = {
+        resource: [
+            [{
+                "id": "100020005000",
+                "text": "男"
+            }],
+            [{
+                "id": "100020025022",
+                "text": "19~22"
+            },
+            {
+                "id": "100020025024",
+                "text": "23~25"
+            }]
+        ]
+    };
+
+    /* 拖拽选择 */
+    var treeDragMod = {
+        noDataHtml: '<li>暂无数据</li>',
+        data: [], // 数据缓存
+        $treeTarget: $('#tree_drag'),
+        $navTarget: $('#nav'),
+        event: function() {
+            $('body').on('click', '#nav li', function () {
+                var $this = $(this);
+                $this.addClass('active').siblings().removeClass('active');
+                treeDragMod.renderDragTree(treeDragMod.getTreeDataById($this.data('id')));
+            }).on('focus keyup', '#search .search-input', function(evt) { // 标签智能搜索
+                var $this = $(this),
+                    curVal = $.trim($(this).val()).toUpperCase(),
+                    $nodeNames = treeDragMod.$treeTarget.find('.node-name');
+                treeDragMod.$treeTarget.find('.tree-node').hide();
+
+                $nodeNames.each(function(index, item) {
+                    var nodeName = $(item).text().toUpperCase();
+                    if (nodeName.indexOf(curVal) !== -1) {
+                        var $treeNode = $(item).parents('.tree-node'); // 当前节点
+                        $treeNode.parent('li').find('ul').find('.tree-node').show(); // 子级显示
+                        showParent($treeNode); // 递归显示父级
+
+                        function showParent($treeNode) {
+                            if ($treeNode.length > 0) {
+                                $treeNode.show();
+                                $treeNode = $treeNode.parent('li').parent('ul').prev('.tree-node');
+                                showParent($treeNode);
+                            }
+                        }
+                    }
+                });
+                evt.stopPropagation();
+            });
+        },
+        init: function() {
+            treeDragMod.event();
+            treeDragMod.getData();
+        },
+        getData: function () {
+            treeDragMod.$treeTarget.addClass('loading');
+            treeDragMod.$navTarget.addClass('loading');
+
+            setTimeout(function () { // 实际中，通过 ajax 获取数据，这儿用 延时 模拟
+                treeDragMod.$treeTarget.removeClass('loading');
+                treeDragMod.$navTarget.removeClass('loading');
+                if (result && result.flag && result.data && result.data.length) {
+                    treeDragMod.data = result.data;
+                    treeDragMod.renderNav(result.data);
+                    if (isEdit) {
+                        relationMod.editInit();
+                    }
+                } else {
+                    treeDragMod.$treeTarget.html(treeDragMod.noDataHtml);
+                    treeDragMod.$navTarget.html(treeDragMod.noDataHtml);
+                }
+            }, 1500);
+        },
+        renderNav: function (data) {
+            var navHtml = '';
+            data.forEach(function (item) {
+                navHtml += '<li data-id="' + item.id + '">' + item.text + '</li>';
+            }) 
+            treeDragMod.$navTarget.html(navHtml);
+            treeDragMod.$navTarget.find('li:first-child').click();
+        },
+        getTreeDataById: function (id) {
+            var arr = [];
+            treeDragMod.data.forEach(function (item) {
+                if (item.id == id) {
+                    arr = item.children;
+                }
+            });
+            return arr;
+        },
+        // 渲染左侧被拖拽的树
+        renderDragTree: function(treeData) {
+            if (treeData && treeData.length) {
+                //实例化树形菜单
+                treeDragMod.$treeTarget.tree({
+                    data: treeData,
+                    dnd: true, // 允许拖拽
+                    formatter: function(node) {
+                        // 统计子节点个数
+                        var text = '<span class="node-name">' + node.text + '</span>';
+                        if (node.children && node.children.length > 0) {
+                            text += '<i class="tip">(' + node.children.length + ')</i>';
+                        }
+                        return text;
+                    },
+                    onLoadSuccess: function(e, node) {
+                        // 折叠树
+                        treeDragMod.$treeTarget.tree('collapseAll');
+                        
+                        // 节点上禁止放置
+                        $.each($('#tree_drag .tree-node'), function(i, item) {
+                            $(item).droppable("disable");
+                        });
+                    }
+                });
+                relationMod.setDragAndDrop();
+            } else {
+                treeDragMod.$treeTarget.html(treeDragMod.noDataHtml);
+            }
+        }
+    };
+    treeDragMod.init();
+
+    var relationMod = {
+        $relationTarget: $('#relation_con'),
+        andHtml: '<p class="and">且</p>',
+        orHtml: '<p class="or">或</p>',
+        orWrapLeftHtml: '<div class="or-wrap"><span class="or-clear">X</span>',
+        orItemHtml: function (item) {
+            return '<p class="item" data-id="' + item.id + '">' + item.text + '<span class="item-del">X</span></p>';
+        },
+        orConHtml: function (arr) {
+            var orConHtml = '';
+            for (var i = 0; i < arr.length; i++) {
+                orConHtml += relationMod.orItemHtml(arr[i]);
+                if (i != (arr.length - 1)) {
+                    orConHtml += relationMod.orHtml;
+                }
+            }
+            return orConHtml;
+        },
+        event: function() {
+            $('body').on('click', '#clear_all', function() { // 清空
+                relationMod.$relationTarget.html('');
+                $('#node_num').html('0');
+            }).on('click', '.item-del', function () { // 删除 item
+                var $this = $(this),
+                    $item = $this.closest('.item'),
+                    $orWrap = $this.closest('.or-wrap');
+                // 删除当前元素及关系
+                // 上一个存在，删上一个，否则删下一个
+                var $prev = $item.prev('.or');
+                if ($prev.length) {
+                    $prev.remove();
+                } else {
+                    var $next = $item.next('.or');
+                    if ($next.length) {
+                        $next.remove();
+                    }
+                }
+                $item.remove();
+                // 删除后，若其父元素无子元素，则删除其父元素
+                if ($orWrap.children('.item').length == 0) {
+                    $orWrap.remove();
+                }
+
+                relationMod.setNodeNum();
+            }).on('click', '.or-clear', function () { // 删除 or-wrap
+                var $this = $(this),
+                    $orWrap = $this.closest('.or-wrap');
+                // 删除当前元素及关系
+                // 上一个存在，删上一个，否则删下一个
+                var $prev = $orWrap.prev('.or');
+                if ($prev.length) {
+                    $prev.remove();
+                } else {
+                    var $next = $orWrap.next('.or');
+                    if ($next.length) {
+                        $next.remove();
+                    }
+                }
+                $orWrap.remove();
+                relationMod.setNodeNum();
+            });
+        },
+        init: function () {
+            relationMod.event();
+        },
+        setNodeNum: function () {
+            $('#node_num').html(relationMod.$relationTarget.find('.item').length);  
+        },
+        // 拖拽操作
+        setDragAndDrop: function () {
+            //设置被拖元素
+            $("#tree_drag .tree-node").draggable({
+                proxy: 'clone',
+                revert: true, //拖动结束后节点将返回它的开始位置
+                cursor: 'pointer',
+                onStartDrag: function () {
+                    $(this).draggable('proxy').css({'background': '#fff', 'opacity': '0.5'});
+                },
+                onStopDrag: function (e) {
+                    var $target = $(e.target),
+                        node = $('#tree_drag').tree('getNode', e.data.target), // 获取被拖动的节点
+                        $clearAll = $('#clear_all');
+                    
+                    // 判断在可拖拽放置区域，才进行放置操作
+                    if ($target.hasClass('and-wrap') || $target.hasClass('or-wrap')) {
+                        $clearAll.show();
+                        $target.append(conHtml());
+                    }
+
+                    function conHtml (relation) {
+                        // 处理 and 且的关系
+                        var conHtml = '';
+                        if ($target.hasClass('and-wrap')) {
+                            if ($target.children().length) {
+                                conHtml += relationMod.andHtml;
+                            }
+                            var innerHtml = node.children ? relationMod.orConHtml(node.children) : relationMod.orItemHtml(node);
+                            conHtml += relationMod.orWrapLeftHtml + innerHtml + '</div>';
+                        } else if ($target.hasClass('or-wrap')) { // 处理 or 或的关系
+                            if ($target.children().length) {
+                                conHtml += relationMod.orHtml;
+                            }
+                            conHtml += node.children ? relationMod.orConHtml(node.children) : relationMod.orItemHtml(node);
+                        }
+                        return conHtml;
+                    }
+
+                    relationMod.setNodeNum();
+                    relationMod.resizeScrollTop();
+                }
+            });
+
+            // 设置目标对象允许放置被拖元素
+            $(".and-con, .or-con").droppable();
+        },
+        // 拖拽放置区内容较多时的设置
+        resizeScrollTop: function () {
+            var height = relationMod.$relationTarget.height(),
+                scrollHeight = $('#relation_con').prop('scrollHeight');
+            if (scrollHeight > height) {
+                relationMod.$relationTarget.scrollTop(scrollHeight);
+            }
+        },
+        // 获取保存数据
+        getSaveData: function () {
+            var andArr = [];
+            relationMod.$relationTarget.find('.or-wrap').each(function (i, or) {
+                var orArr = [];
+                $(or).find('.item').each(function (i, item) {
+                    orArr.push($(item).data('id'));
+                });
+                andArr.push(orArr);
+
+            });
+            return andArr;
+        },
+        // 回填
+        editInit: function() {
+            if (editJson.resource && editJson.resource.length) {
+                var html = '';
+                editJson.resource.forEach(function (item, i) {
+                    html += relationMod.orWrapLeftHtml + relationMod.orConHtml(item) + '</div>';
+                    if (i != (editJson.resource.length - 1)) {
+                        html += relationMod.andHtml;
+                    }
+                });
+                relationMod.$relationTarget.html(html);
+                relationMod.setNodeNum();
+            }
+        }
+    };
+
+    relationMod.init();
+
+    $('#save').click(function () {
+        console.log('save data', relationMod.getSaveData());
+    });
+    </script>
+</body>
+</html>
