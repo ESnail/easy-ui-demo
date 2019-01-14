@@ -419,11 +419,11 @@
                     $orWrap = $this.closest('.or-wrap');
                 // 删除当前元素及关系
                 // 上一个存在，删上一个，否则删下一个
-                var $prev = $orWrap.prev('.or');
+                var $prev = $orWrap.prev('.and');
                 if ($prev.length) {
                     $prev.remove();
                 } else {
-                    var $next = $orWrap.next('.or');
+                    var $next = $orWrap.next('.and');
                     if ($next.length) {
                         $next.remove();
                     }
