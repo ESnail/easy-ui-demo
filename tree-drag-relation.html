@@ -34,17 +34,7 @@
             height: 100%;
             line-height: 100%;
         }
-        .loading:before {
-            position: absolute;
-            top: calc(50% - 5px);
-            left: calc(50% - 5px);
-            content: "";
-            width: 10px;
-            height: 10px;
-            border-radius: 100%;
-            background: skyblue;
-            animation: loading-reverse .8s linear infinite; 
-        }
+        .loading:before,
         .loading:after {
             position: absolute;
             top: calc(50% - 5px);
@@ -53,6 +43,12 @@
             width: 10px;
             height: 10px;
             border-radius: 100%;
+        }
+        .loading:before {
+            background: skyblue;
+            animation: loading-reverse .8s linear infinite; 
+        }
+        .loading:after {
             background: yellow;
             animation: loading .8s linear infinite; 
         }
@@ -369,7 +365,8 @@
         }
     };
     treeDragMod.init();
-
+    
+    /* 关系 */
     var relationMod = {
         $relationTarget: $('#relation_con'),
         andHtml: '<p class="and">且</p>',
@@ -408,9 +405,9 @@
                     }
                 }
                 $item.remove();
-                // 删除后，若其父元素无子元素，则删除其父元素
+                // 删除后，若其父元素无子元素，则删除其父元素，及其关系
                 if ($orWrap.children('.item').length == 0) {
-                    $orWrap.remove();
+                    $orWrap.find('.or-clear').click();
                 }
 
                 relationMod.setNodeNum();
